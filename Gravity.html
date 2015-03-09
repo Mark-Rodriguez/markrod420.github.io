@@ -1,0 +1,403 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Gravity</title>
+
+    <script src="jquery.min.js"></script>
+    <script src="MRRMath.js"></script>
+
+    <style>
+        html, body{
+            padding:0px;
+            margin:0px;
+        }
+
+        #canv{
+            background-color:#181818;
+        }
+    </style>
+
+    <script>
+
+        var gravit = null;
+
+
+        function onLoad()
+        {
+            gravit = new Gravity(2500);
+            gravit.init();
+        }
+
+        function Gravity(startCount)
+        {
+            this.startCount = startCount;
+            this.lightSpeed = 10;
+            this.canvas = null;
+            this.ctx = null;
+            this.dots = [];
+            this.gravs = [];
+            this.drawLines = true;
+            this.spd = 1;
+            this.menuShowing = false;
+            this.showGravs = true;
+            this.dotsCheckDots = false;
+            this.mergeTouching = false;
+            this.mergeDistance = 1;
+            this.distMult = 5;
+            this.drawTips = false;
+            this.menu = new Menu(this, this.startCount, this.lightSpeed, this.showGravs)
+        }
+
+        Gravity.prototype.init = function()
+        {
+            var self = this;
+
+            this.canvas = document.createElement("canvas");
+            $(this.canvas).css({ width: "100%", height: "100%", backgroundColor: "#181818" });
+            $(document.body).append(this.canvas);
+
+            this.ctx = this.canvas.getContext("2d");
+
+            window.setInterval(function () {
+                self.doFrame();
+            }, 1000 / 24.0);
+
+
+            for (var g = 0; g < this.startCount; g++) {
+                this.dots.push({
+                    x: Math.random() * $(window).width(),
+                    y: Math.random() * $(window).height(),
+                    motion: new MRRVector(0, 0, true),
+                    weight: .5,
+                    hists: []
+                });
+
+            }
+
+            /*$(canvas).click(function (e) {
+                gravs.push({
+                    x: e.pageX,
+                    y: e.pageY,
+                    weight:100
+                });
+            });*/
+
+            var gravInterval = null;
+
+            $(this.canvas).mousedown(function (e) {
+
+                var grav = { x: e.pageX, y: e.pageY, weight: 100 };
+
+                self.gravs.push(grav);
+
+                gravInterval = window.setInterval(function () {
+                    grav.weight += 2 + (grav.weight * .1);
+                }, 1000 / 34.0);
+            });
+
+
+            $(this.canvas).mouseup(function (e) {
+                window.clearInterval(gravInterval);
+            });
+
+            $(window).keydown(function (e) {
+                if (self.menuShowing) {
+                    return false;
+                }
+
+                if (e.keyCode == 77) {
+                    self.menuShowing = true;
+                    self.menu.show();
+                }
+                if (e.keyCode == 38) {
+                    self.spd = self.spd + 1;
+                }
+
+                if (e.keyCode == 40) {
+                    self.spd = self.spd - 1;
+                }
+            });
+        }
+
+        Gravity.prototype.doFrame = function()
+        {
+
+            this.canvas.width = $(window).width();
+            this.canvas.height = $(window).height();
+
+            this.ctx = this.canvas.getContext("2d");
+
+            if (this.menuShowing) {
+                return;
+            }
+
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            //canvas.css({position:"absolute", width:"100%", height:"100%"});
+            //canvas.css("width", $(window).width() + "px")
+            //canvas.css("height", $(window).height() + "px")
+
+            for (var i = 0; i < this.spd; i++) {
+                for (var g = this.dots.length - 1; g > -1; g--) {
+
+                    for (var h = 0; h < this.gravs.length; h++) {
+                        this.modObjMotion(this.dots[g], this.gravs[h]);
+                    }
+
+                    if (this.dotsCheckDots) {
+                        for (var h = this.dots.length - 1; h > -1; h--) {
+                            if (g != h) {
+        
+                                /*if (getDistanceFromTo(dots[g].x, dots[g].y, dots[h].x, dots[h].y) < 2)
+                                {
+                                    var perc = 1;
+                                    var tmp = new MRRVector(0, 0);
+        
+                                    if (dots[g].weight > dots[g].weight)
+                                    {
+                                        perc = dots[g].weight / dots[h].weight;
+                                        tmp = new MRRVector(dots[h].motion.ang, dots[h].motion.mag / perc);
+                                        dots[g].motion = dots[g].motion.addVector(tmp);
+                                    }
+                                    else
+                                    {
+                                        perc = dots[h].weight / dots[g].weight;
+                                        tmp = new MRRVector(dots[g].motion.ang, dots[g].motion.mag / perc);
+                                        dots[g].motion = dots[h].motion.addVector(tmp);
+                                    }
+        
+                                    dots[g].weight += dots[h];
+        
+                                    dots.splice(h, 1);
+                                }
+                                else
+                                {*/
+                                this.modObjMotion(this.dots[g], this.dots[h]);
+                                //}
+                            }
+                        }
+                    }
+
+                    if (this.dots.length <= g) {
+                        g = this.dots.length - 1;
+                    }
+
+                    if (this.dots[g].motion.mag > this.lightSpeed) {
+                        this.dots[g].motion.setAngMag(this.dots[g].motion.ang, this.lightSpeed);
+                    }
+
+                }
+                for (var g = 0; g < this.dots.length; g++) {
+
+                    this.dots[g].hists.push({ x: this.dots[g].x, y: this.dots[g].y });
+                    if (this.dots[g].hists.length > 10) {
+                        this.dots[g].hists.splice(0, 1);
+                    }
+                    this.dots[g].x += this.dots[g].motion.x;
+                    this.dots[g].y += this.dots[g].motion.y;
+
+                    if (this.dots[g].x > $(window).width() + 0) {
+                        if (this.dots[g].motion.x > 0) {
+                            this.dots[g].motion.setXY(-this.dots[g].motion.x, this.dots[g].motion.y);
+                        }
+                    }
+
+                    if (this.dots[g].x < 0) {
+                        if (this.dots[g].motion.x < 0) {
+                            this.dots[g].motion.setXY(-this.dots[g].motion.x, this.dots[g].motion.y);
+                        }
+                    }
+
+                    if (this.dots[g].y > $(window).height() + 0) {
+                        if (this.dots[g].motion.y > 0) {
+                            this.dots[g].motion.setXY(this.dots[g].motion.x, -this.dots[g].motion.y);
+                        }
+                    }
+
+                    if (this.dots[g].y < 0) {
+                        if (this.dots[g].motion.y < 0) {
+                            this.dots[g].motion.setXY(this.dots[g].motion.x, -this.dots[g].motion.y);
+                        }
+                    }
+
+                }
+            }
+
+            for (var g = 0; g < this.dots.length; g++) {
+                this.drawDot(this.dots[g]);
+            }
+
+            if (this.showGravs) {
+                for (var g = 0; g < this.gravs.length; g++) {
+                    this.drawGrav(this.gravs[g]);
+                }
+            }
+
+            if (this.mergeTouching)
+            {
+                for (var g = this.dots.length - 1; g > -1; g--)
+                {
+                    for (var h = this.dots.length - 1; h > -1; h--)
+                    {
+                        if (g != h && getDistanceFromTo(this.dots[g].x, this.dots[g].y, this.dots[h].x, this.dots[h].y) < Math.min(10, Math.max(1, Math.max(this.dots[g].weight, this.dots[h].weight) / 10)))
+                        {
+                            var perc = 1;
+                            var tmp = new MRRVector(0, 0);
+
+                            if (this.dots[g].weight > this.dots[h].weight) {
+                                perc = this.dots[g].weight / this.dots[h].weight;
+                                tmp = new MRRVector(this.dots[h].motion.ang, this.dots[h].motion.mag / perc);
+                                this.dots[g].motion = this.dots[g].motion.addVector(tmp);
+                                this.dots[g].weight += this.dots[h].weight;
+                                this.dots.splice(h, 1);
+                            }
+                            else {
+                                perc = this.dots[h].weight / this.dots[g].weight;
+                                tmp = new MRRVector(this.dots[g].motion.ang, this.dots[g].motion.mag / perc);
+                                this.dots[g].motion = this.dots[h].motion.addVector(tmp);
+                                this.dots[h].weight += this.dots[g].weight;
+                                this.dots.splice(g, 1);
+                            }
+
+
+
+                            if (h >= this.dots.length)
+                            {
+                                h = this.dots.length - 1;
+                            }
+
+                            if (g >= this.dots.length)
+                            {
+                                g = this.dots.length - 1;
+                            }
+                        }
+                    }
+                }
+
+                while(this.dots.length < this.startCount)
+                {
+                    this.dots.push({
+                        x: Math.random() * $(window).width(),
+                        y: Math.random() * $(window).height(),
+                        motion: new MRRVector(0, 0, true),
+                        weight: .5,
+                        hists: []
+                    });
+                }
+            }
+        }
+
+        Gravity.prototype.drawGrav = function(grav)
+        {
+            this.ctx.fillStyle = 'rgba(70, 0, 160, .2)';
+            this.ctx.beginPath();
+            this.ctx.arc(grav.x, grav.y, (grav.weight / 100), 0, Math.PI * 2);
+            this.ctx.closePath();
+            this.ctx.fill();
+        }
+
+        Gravity.prototype.drawDot = function(dot)
+        {
+
+            var d = 0;
+            for (var g = 1; g < dot.hists.length; g++) {
+                d += getDistanceFromTo(dot.hists[g - 1].x, dot.hists[g - 1].y, dot.hists[g].x, dot.hists[g].y);
+            }
+
+            d += getDistanceFromTo(dot.hists[dot.hists.length - 1].x, dot.hists[dot.hists.length - 1].y, dot.x, dot.y);
+
+            var c1 = { r: 50, g: 0, b: 255, a: 100 };
+            var c2 = { r: 200, g: 150, b: 0, a: 100 };
+
+            var perc = d / 110.0;
+
+            if (perc > 1) {
+                alert(perc + "   " + d);
+            }
+
+            var c3 = { r: c1.r + (c2.r - c1.r) * perc, g: c1.g + (c2.g - c1.g) * perc, b: c1.b + (c2.b - c1.b) * perc, a: c1.a + (c2.a - c1.a) * perc };
+
+            c3.r = Math.max(0, Math.min(255, Math.round(c3.r)));
+            c3.g = Math.max(0, Math.min(255, Math.round(c3.g)));
+            c3.b = Math.max(0, Math.min(255, Math.round(c3.b)));
+            c3.a = Math.max(0, Math.min(255, Math.round(c3.a)));
+
+            if (this.drawLines) {
+                this.ctx.strokeStyle = "rgba(" + c3.r + "," + c3.g + "," + c3.b + "," + (c3.a / 255.0) + ")";
+                this.ctx.beginPath();
+
+                this.ctx.moveTo(dot.hists[0].x, dot.hists[0].y);
+
+
+
+                for (var g = 1; g < dot.hists.length; g++) {
+                    this.ctx.lineTo(dot.hists[g].x, dot.hists[g].y);
+                }
+
+                this.ctx.lineTo(dot.x, dot.y);
+                
+                this.ctx.stroke();
+
+                if (this.drawTips) {
+                    this.ctx.beginPath();
+
+                    this.ctx.arc(dot.x, dot.y, dot.weight, 0, Math.PI * 2);
+                    this.ctx.stroke();
+                }
+            }
+            else {
+
+                for (var g = 0; g < dot.hists.length; g++) {
+                    this.ctx.strokeStyle = "rgba(" + c3.r + "," + c3.g + "," + c3.b + "," + ((c3.a / 255.0) * (g / (dot.hists.length - 1))) + ")";
+                    this.ctx.beginPath();
+                    this.ctx.arc(dot.hists[g].x, dot.hists[g].y, dot.weight * 2, 0, Math.PI * 2);
+                    this.ctx.closePath();
+                    this.ctx.stroke();
+                }
+                //var c = new document.createElement("canvas");
+
+                //var ctx = c.getContext("2d");
+                this.ctx.strokeStyle = "rgba(" + c3.r + "," + c3.g + "," + c3.b + "," + 1 + ")";
+                this.ctx.beginPath();
+                this.ctx.arc(dot.x, dot.y, dot.weight * 4, 0, Math.PI * 2);
+                this.ctx.closePath();
+                this.ctx.stroke();
+            }
+        }
+
+        Gravity.prototype.getGravBetween = function(obj1, obj2)
+        {
+            var w = obj1.weight * obj2.weight;
+
+            var c = .01;
+            //w = w / 50;
+
+            var d = getDistanceFromTo(obj1.x, obj1.y, obj2.x, obj2.y) * this.distMult;
+
+            return c * (w / d);
+        }
+
+        Gravity.prototype.modObjMotion = function (obj1, obj2) {
+            obj1.motion = obj1.motion.addVector(new MRRVector(getAngleFromTo(obj1.x, obj1.y, obj2.x, obj2.y), this.getGravBetween(obj1, obj2)));
+        }
+
+
+        function Menu(gravity, cnt, lightSpeed, showGravs)
+        {
+            this.gravity = gravity;
+            this.count = cnt;
+            this.lightSpeed = lightSpeed;
+            this.showGravs = showGravs;
+            this.cont = $("<div style='position:absolute;top:0px;left:0px;width:100%;height:100%;background-color:rgba(0, 0, 0, .6);'></div>");
+            this.bod = $("<div style='margin:10%;width:80%;height:65%;background-color:white;border-radius:15px;'></div>");
+            this.cont.append(this.bod);
+        }
+
+        Menu.prototype.show = function()
+        {
+            $(document.body).append(this.cont);
+        }
+    </script>
+</head>
+<body onload="onLoad();">
+</body>
+</html>
