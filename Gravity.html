@@ -10,10 +10,39 @@
         html, body{
             padding:0px;
             margin:0px;
+            overflow:hidden;
+            position: fixed;
         }
 
         #canv{
             background-color:#181818;
+        }
+        .val-slide
+        {
+            border-radius:2px;
+            border:solid 1px #808080;
+            background-color:#eeeeee;
+            cursor:pointer;
+        }
+        .val-slide-bar
+        {
+            border-radius:2px;
+            border:solid 1px #808080;
+            background-color:#dddddd;
+        }
+
+        .val-slide:hover>.val-slide-bar{
+            border:solid 1px #808080;
+            background-color:#2f7fd5;
+        }
+
+        .no-select
+        {
+            -moz-user-select: none; 
+            -webkit-user-select: none; 
+            -ms-user-select:none; 
+            user-select:none;
+            -o-user-select:none;
         }
     </style>
 
@@ -24,7 +53,7 @@
 
         function onLoad()
         {
-            gravit = new Gravity(2500);
+            gravit = new Gravity(1000);
             gravit.init();
         }
 
@@ -44,13 +73,58 @@
             this.mergeTouching = false;
             this.mergeDistance = 1;
             this.distMult = 5;
-            this.drawTips = false;
+            this.dotWeight = .5;
+            this.gravConst = .01;
+            this.drawTips = true;
+            this.frameInterval = null;
             this.menu = new Menu(this, this.startCount, this.lightSpeed, this.showGravs)
+
+            var self = this;
+
+            $(window).keydown(function (e) {
+
+                if (e.keyCode == 77) {
+                    if (!self.menuShowing) {
+                        self.menu = new Menu(self, self.dots.length, self.lightSpeed, self.showGravs);
+                        self.menuShowing = true;
+                        self.menu.show();
+                    }
+                    else {
+                        self.menuShowing = false;
+                        self.menu.hide();
+                        if (self.menu.count != self.startCount)
+                        {
+                            self.startCount = self.menu.count;
+                            self.init();
+                        }
+                    }
+                }
+
+                if (self.menuShowing) {
+                    return false;
+                }
+
+                if (e.keyCode == 38) {
+                    self.spd = self.spd + 1;
+                }
+
+                if (e.keyCode == 40) {
+                    self.spd = self.spd - 1;
+                }
+            });
         }
 
         Gravity.prototype.init = function()
         {
             var self = this;
+
+            if (this.canvas != null)
+            {
+                $(this.canvas).remove();
+                window.clearInterval(this.frameInterval);
+                this.dots = [];
+                this.ravs = [];
+            }
 
             this.canvas = document.createElement("canvas");
             $(this.canvas).css({ width: "100%", height: "100%", backgroundColor: "#181818" });
@@ -58,7 +132,7 @@
 
             this.ctx = this.canvas.getContext("2d");
 
-            window.setInterval(function () {
+            this.frameInterval = window.setInterval(function () {
                 self.doFrame();
             }, 1000 / 24.0);
 
@@ -68,7 +142,7 @@
                     x: Math.random() * $(window).width(),
                     y: Math.random() * $(window).height(),
                     motion: new MRRVector(0, 0, true),
-                    weight: .5,
+                    weight: self.dotWeight,
                     hists: []
                 });
 
@@ -98,24 +172,6 @@
 
             $(this.canvas).mouseup(function (e) {
                 window.clearInterval(gravInterval);
-            });
-
-            $(window).keydown(function (e) {
-                if (self.menuShowing) {
-                    return false;
-                }
-
-                if (e.keyCode == 77) {
-                    self.menuShowing = true;
-                    self.menu.show();
-                }
-                if (e.keyCode == 38) {
-                    self.spd = self.spd + 1;
-                }
-
-                if (e.keyCode == 40) {
-                    self.spd = self.spd - 1;
-                }
             });
         }
 
@@ -238,7 +294,7 @@
                 {
                     for (var h = this.dots.length - 1; h > -1; h--)
                     {
-                        if (g != h && getDistanceFromTo(this.dots[g].x, this.dots[g].y, this.dots[h].x, this.dots[h].y) < Math.min(10, Math.max(1, Math.max(this.dots[g].weight, this.dots[h].weight) / 10)))
+                        if (g != h && getDistanceFromTo(this.dots[g].x, this.dots[g].y, this.dots[h].x, this.dots[h].y) < Math.min(1, Math.max(1, Math.max(this.dots[g].weight, this.dots[h].weight) / 10)))
                         {
                             var perc = 1;
                             var tmp = new MRRVector(0, 0);
@@ -279,7 +335,7 @@
                         x: Math.random() * $(window).width(),
                         y: Math.random() * $(window).height(),
                         motion: new MRRVector(0, 0, true),
-                        weight: .5,
+                        weight: this.dotWeight,
                         hists: []
                     });
                 }
@@ -308,11 +364,9 @@
             var c1 = { r: 50, g: 0, b: 255, a: 100 };
             var c2 = { r: 200, g: 150, b: 0, a: 100 };
 
-            var perc = d / 110.0;
+            var perc = d / (this.lightSpeed * 11);
 
-            if (perc > 1) {
-                alert(perc + "   " + d);
-            }
+            perc = Math.min(perc, 1);
 
             var c3 = { r: c1.r + (c2.r - c1.r) * perc, g: c1.g + (c2.g - c1.g) * perc, b: c1.b + (c2.b - c1.b) * perc, a: c1.a + (c2.a - c1.a) * perc };
 
@@ -340,7 +394,7 @@
                 if (this.drawTips) {
                     this.ctx.beginPath();
 
-                    this.ctx.arc(dot.x, dot.y, dot.weight, 0, Math.PI * 2);
+                    this.ctx.arc(dot.x, dot.y, dot.weight / 10, 0, Math.PI * 2);
                     this.ctx.stroke();
                 }
             }
@@ -368,7 +422,7 @@
         {
             var w = obj1.weight * obj2.weight;
 
-            var c = .01;
+            var c = this.gravConst;
             //w = w / 50;
 
             var d = getDistanceFromTo(obj1.x, obj1.y, obj2.x, obj2.y) * this.distMult;
@@ -387,14 +441,256 @@
             this.count = cnt;
             this.lightSpeed = lightSpeed;
             this.showGravs = showGravs;
-            this.cont = $("<div style='position:absolute;top:0px;left:0px;width:100%;height:100%;background-color:rgba(0, 0, 0, .6);'></div>");
-            this.bod = $("<div style='margin:10%;width:80%;height:65%;background-color:white;border-radius:15px;'></div>");
+            this.cont = $("<div class='no-select' style='position:absolute;top:0px;left:0px;width:100%;height:100%;background-color:rgba(0, 0, 0, .6);'></div>");
+            this.bod = $("<div style='margin:10%;width:80%;height:65%;background-color:#444444;border-radius:15px;'></div>");
+
+            this.ls = $("<div style='float:left;padding:25px;width:200px;height:65px;font-size:24px;color:#666666;'></div>");
+            this.lss = $("<div style='color:#cccccc;'>Light Speed: " + this.lightSpeed + "<br/><span style='font-size:12px'>(No Reset on Change)</span></div>");
+            this.bod.append(this.ls);
+
+            this.cnts = $("<div style='float:left;padding:25px;width:300px;height:65px;font-size:24px;color:#666666;'></div>");
+            this.cntss = $("<div style='color:#cccccc;'>Particles: " + this.count + "<br/><span style='font-size:12px'>(Reset on Change)</span></div>");
+            this.bod.append(this.cnts);
+
+            var v = (Math.round(this.gravity.distMult * 100) * .01) + "";
+
+            if (v.length > v.indexOf(".") + 3) {
+                v = v.substr(0, v.indexOf(".") + 3);
+            }
+
+            this.dm = $("<div style='float:left;padding:25px;width:300px;height:65px;font-size:24px;color:#666666;'></div>");
+            this.dms = $("<div style='color:#cccccc;'>Distance Multiplier: " + v + "<br/><span style='font-size:12px'>(Lower = Stronger Attraction, No Reset on Change)</span></div>");
+            this.bod.append(this.dm);
+
+            var v = (Math.round(this.gravity.gravConst * 1000) * .001) + "";
+
+            if (v.length > v.indexOf(".") + 4) {
+                v = v.substr(0, v.indexOf(".") + 4);
+            }
+
+            this.gc = $("<div style='float:left;padding:25px;width:400px;height:65px;font-size:24px;color:#666666;'></div>");
+            this.gcs = $("<div style='color:#cccccc;'>Gravity Constant: " + v + "<br/><span style='font-size:12px'>(Lower = Weaker Attraction, No Reset on Change)</span></div>");
+            this.bod.append(this.gc);
+
+            var self = this;
+
+            this.gcSlide = new ValSlide("400px", "15px", .001, .1, 0, "horizontal", function (cnt) {
+                self.gravity.gravConst = cnt;
+                var v = (Math.round(cnt * 1000) * .001) + "";
+
+                if (v.length > v.indexOf(".") + 4)
+                {
+                    v = v.substr(0, v.indexOf(".") + 4);
+                }
+
+                self.gcs.html("Gravity Constant: " + v + "<br/><span style='font-size:12px'>(Lower = Weaker Attraction, No Reset on Change)</span>");
+            });
+
+            this.dmSlide = new ValSlide("300px", "15px", .5, 15, 0, "horizontal", function (cnt) {
+                self.gravity.distMult = cnt;
+                var v = (Math.round(cnt * 100) * .01) + "";
+
+                if (v.length > v.indexOf(".") + 3)
+                {
+                    v = v.substr(0, v.indexOf(".") + 3);
+                }
+
+                self.dms.html("Distance Multiplier: " + v + "<br/><span style='font-size:12px'>(Lower = Stronger Attraction, No Reset on Change)</span>");
+            });
+
+            this.cntSlide = new ValSlide("300px", "15px", 50, 5000, 0, "horizontal", function (cnt) {
+                self.count = Math.round(cnt);
+                self.cntss.html("Particles: " + Math.round(cnt) + "<br/><span style='font-size:12px'>(Changing Resets Screen)</span>");
+            });
+
+            this.lsSlide = new ValSlide("200px", "15px", 1, 50, 1, "horizontal", function (ls) {
+                self.lightSpeed = ls;
+                self.gravity.lightSpeed = ls;
+                self.lss.html("Light Speed: " + ls + "<br/><span style='font-size:12px'>(No Reset on Change)</span>");
+            });
+
+            this.gcSlide.div.css("margin-top", "5px");
+
+            this.gcSlide.setValue(this.gravity.gravConst);
+
+            this.cntSlide.div.css("margin-top", "5px");
+
+            this.cntSlide.setValue(this.count);
+
+            this.dmSlide.div.css("margin-top", "5px");
+
+            this.dmSlide.setValue(this.gravity.distMult);
+
+            this.lsSlide.div.css("margin-top", "5px");
+
+            this.lsSlide.setValue(this.lightSpeed);
+
+            this.gc.append(this.gcs);
+            this.gc.append(this.gcSlide.div);
+
+            this.dm.append(this.dms);
+            this.dm.append(this.dmSlide.div);
+
+            this.cnts.append(this.cntss);
+            this.cnts.append(this.cntSlide.div);
+
+            this.ls.append(this.lss);
+            this.ls.append(this.lsSlide.div);
+
             this.cont.append(this.bod);
         }
 
         Menu.prototype.show = function()
         {
             $(document.body).append(this.cont);
+        }
+
+        Menu.prototype.hide = function()
+        {
+            this.cont.remove();
+            this.lsSlide.unlisten();
+        }
+
+        function ValSlide(width, height, min, max, increment, orientation, onChange)
+        {
+            this.width = width;
+            this.height = height;
+            this.min = min;
+            this.max = max;
+            this.increment = increment;
+            this.orientation = orientation;
+            this.value = min;
+            this.onChange = onChange;
+
+            this.hoverColor = "#2f7fd5";
+
+            this.div = $("<div class='val-slide' style='position:relative;width:" + width + ";height:" + height + ";'></div>");
+
+            this.bar = $("<div class='val-slide-bar' style='position:absolute;left:-1px;top:-1px;width:" + (orientation == "vertical" ? width : height) + ";height:" + (orientation == "vertical" ? width : height) + ";'></div>");
+
+            this.div.append(this.bar);
+
+            var self = this;
+
+            this.mm = null;
+            this.mu = null;
+            this.ml = null;
+
+            this.mm = function (t) {
+                var cv = self.value;
+                if (orientation == "vertical")
+                {
+                }
+                else
+                {
+                    if (t.pageX < self.div.offset().left) {
+                        self.bar.css("left", "-1px");
+                        self.value = min;
+                    }
+                    else
+                    {
+                        if (t.pageX > self.div.offset().left + self.div.width()) {
+                            self.bar.css("left", (self.div.width() - self.bar.width()) + "px")
+                            self.value = max;
+                        }
+                        else {
+                            if (increment == 0) {
+                                self.bar.css("left", Math.max(-1, Math.min((self.div.width() - self.bar.width()), t.pageX - self.div.offset().left - self.bar.width() * .5)) + "px");
+                                var v = Math.max(-1, Math.min((self.div.width() - self.bar.width()), t.pageX - self.div.offset().left - self.bar.width() * .5));
+                                var p = (v + 1) / (self.div.width() - self.bar.width() + 2);
+                                var val = min + ((max - min) * p);
+                                self.value = val;
+                            }
+                            else
+                            {
+                                var v = Math.max(-1, Math.min((self.div.width() - self.bar.width()), t.pageX - self.div.offset().left - self.bar.width() * .5));
+                                var p = (v + 1) / (self.div.width() - self.bar.width() + 1);
+                                var val = min + ((max - min) * p);
+
+                                var fl = Math.floor(val / increment);
+                                var ce = Math.ceil(val / increment);
+
+                                var incCount = 0;
+
+                                if (Math.abs(fl * increment - val) < Math.abs(ce * increment - val))
+                                {
+                                    incCount = fl;
+                                }
+                                else
+                                {
+                                    incCount = ce;
+                                }
+
+                                self.value = incCount * increment;
+
+                                p = ((incCount * increment) - min) / (max - min);
+
+                                p = Math.max(0, Math.min(1, p));
+
+                                self.bar.css("left", ((self.div.width() - self.bar.width()) * p - 1) + "px");
+                            }
+                        }
+                    }
+                }
+                if (self.value != cv)
+                {
+                    self.onChange(self.value);
+                }
+            };
+            this.mu = function (t) {
+                self.bar.css("background-color", "");
+                $(window).unbind("mouseup", self.mu);
+                $(window).unbind("mouseleave", self.ml);
+                $(window).unbind("mousemove", self.mm);
+            };
+            this.ml = function (t) {
+                if (t.target != window)
+                {
+                    return;
+                }
+                self.bar.css("background-color", "");
+                $(window).unbind("mouseup", self.mu);
+                $(window).unbind("mouseleave", self.ml);
+                $(window).unbind("mousemove", self.mm);
+            };
+
+            this.md = function (t) {
+                self.bar.css("background-color", self.hoverColor);
+                $(window).mousemove(self.mm);
+                $(window).mouseup(self.mu);
+                $(window).mouseleave(self.ml);
+                self.mm(t);
+            };
+            
+            this.div.mousedown(this.md);
+        }
+
+        ValSlide.prototype.unlisten = function ()
+        {
+            $(window).unbind("mouseup", this.mu);
+            $(window).unbind("mouseleave", this.ml);
+            $(window).unbind("mousemove", this.mm);
+        }
+
+        ValSlide.prototype.setValue = function(value)
+        {
+            this.value = value;
+
+            var p = (value - this.min) / (this.max - this.min);
+
+            this.bar.css("left", (-1 + (this.div.width() - this.bar.width() + 1) * p) + "px");
+        }
+
+        ValSlide.prototype.dispose = function()
+        {
+            this.div.unbind("mousedown", this.md);
+            $(window).unbind("mouseup", this.mu);
+            $(window).unbind("mouseleave", this.ml);
+            $(window).unbind("mousemove", this.mm);
+        }
+
+        ValSlide.prototype.divClick = function(e)
+        {
         }
     </script>
 </head>
