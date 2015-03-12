@@ -44,6 +44,18 @@
             user-select:none;
             -o-user-select:none;
         }
+        .intro{
+            font-size:24px;
+            width:250px;
+            pointer-events:none;
+            color:#cccccc;
+        }
+        .center-ele {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+        }
     </style>
 
     <script>
@@ -53,9 +65,29 @@
 
         function onLoad()
         {
-            alert("Open/Close the Menu with \"m\"");
+            //alert("Open/Close the Menu with \"m\"");
+
             gravit = new Gravity(1000);
             gravit.init();
+
+            var msg = $("<div class='center-ele intro'>Press \"M\" to open and close the menu</div>");
+
+            $(document.body).append(msg);
+
+            var opac = 1;
+
+            var introInterval = window.setInterval(function () {
+                opac -= .02;
+                msg.css("opacity", opac);
+
+                if (opac <= 0)
+                {
+                    msg.remove();
+                    window.clearInterval(introInterval);
+                }
+            }, 1000 / 24);
+
+
         }
 
         function Gravity(startCount)
